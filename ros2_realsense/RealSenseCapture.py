@@ -61,7 +61,7 @@ class RealsenseCapture:
         self.capture_time = None
         self.first_capture_time = None
 
-    def capture(self, time, idx, show_frame, save_frame):
+    def capture(self, show_frame):
         # this is a blocking call - waits for the next set of frames
         frames = self.pipe.wait_for_frames()
 
@@ -80,20 +80,16 @@ class RealsenseCapture:
             if show_frame:
                 cv2.imshow("RealSense", self.image)
                 cv2.waitKey(1)
-                
-            if time is None:
-                time = (capture_time - self.first_capture_time) / 1000.0  # convert to seconds
-
-            # write image to disk
-            if save_frame:
-                filename = f"image_{idx:04d}_{time:.3f}.png"
-                image_filename = os.path.join(self.out_dir, filename)
-                cv2.imwrite(image_filename, self.image)
 
         else:
             print("Frame is invalid or dropped.")
 
         return self.image, self.capture_time
+    
+    def save_image(self, time, idx, image):
+        filename = f"image_{idx:04d}_{time:.3f}.png"
+        image_filename = os.path.join(self.out_dir, filename)
+        cv2.imwrite(image_filename, image)
 
     def stop(self):
         self.pipe.stop()

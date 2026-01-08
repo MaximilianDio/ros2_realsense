@@ -2,9 +2,16 @@ import cv2
 import os
 import numpy as np
 from natsort import natsorted
+import sys
 
 """
 Generate a video from a sequence of images stored in a folder.
+
+Usage:
+    python generate_video.py <image_folder> <output_video> [fps]
+    - image_folder: Path to folder containing .png images
+    - output_video: Path for output video file
+    - fps: (optional) Frames per second (default: 30)
 """
 
 
@@ -103,10 +110,21 @@ def generate_video_from_images(image_folder, output_video, fps=30):
     print(f"Video saved as {output_video}")
 
 
-if __name__ == "__main__":
-    image_folder = f"out/test"  # Replace with your folder path
-    output_video = f"out/test/video.mp4"  # Replace with your desired output video name
-    fps = 60  # Frames per second
+def main(args=None):
+    if len(sys.argv) < 3:
+        print("Usage: generate_video <image_folder> <output_video> [fps]")
+        print("  image_folder: Path to folder containing .png images")
+        print("  output_video: Path for output video file")
+        print("  fps: (optional) Frames per second (default: 30)")
+        sys.exit(1)
+    
+    image_folder = sys.argv[1]
+    output_video = sys.argv[2]
+    fps = int(sys.argv[3]) if len(sys.argv) > 3 else 30
 
-    print("Generating video from captured images...")
+    print(f"Generating video from images in {image_folder}...")
     generate_video_from_images(image_folder, output_video, fps)
+
+
+if __name__ == "__main__":
+    main()

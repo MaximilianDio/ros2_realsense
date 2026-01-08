@@ -27,6 +27,7 @@ setup(
     entry_points={
         'console_scripts': [
             'ros2_realsense = ros2_realsense.ros2_realsense:main',
+            'generate_video = ros2_realsense.generate_video:main',
         ],
     },
 )
