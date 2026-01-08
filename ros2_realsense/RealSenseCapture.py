@@ -26,14 +26,19 @@ class RealsenseCapture:
 
         self.pipe = rs.pipeline()
         config = rs.config()
-        config.enable_stream(
-            rs.stream.color, 960, 540, rs.format.bgr8, 60
-        )  # Increased resolution, reduced frame rate
-
-        # config.enable_stream(
-        #     rs.stream.color, 1920, 1080, rs.format.bgr8, 30
-        # )  # Default resolution, increased frame rate
+        config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 60)  
+        # config.enable_stream(rs.stream.color, 960, 540, rs.format.bgr8, 60)  
+        # config.enable_stream(rs.stream.color, 1920, 1080, rs.format.bgr8, 30 ) 
         cfg = self.pipe.start(config)
+         
+        # Set camera settings for faster exposure and gain
+        sensor = cfg.get_device().first_color_sensor()
+        sensor.set_option(rs.option.enable_auto_exposure, 0)
+        sensor.set_option(rs.option.white_balance, 3000)
+        sensor.set_option(rs.option.exposure, 30)  # Lower value for faster exposure (try 1-20)
+        sensor.set_option(rs.option.gain, 64)  # Increase gain if image is too dark (try 16-64)
+        
+       
 
         self.intr = cfg.get_stream(rs.stream.color).as_video_stream_profile().get_intrinsics()
         self.mtx = np.array([[self.intr.fx, 0, self.intr.ppx],
@@ -45,16 +50,7 @@ class RealsenseCapture:
         np.savetxt(os.path.join(self.out_dir, "camera_matrix.txt"), self.mtx)
         np.savetxt(os.path.join(self.out_dir, "dist_coeffs.txt"), self.dist)
         
-        # Set camera settings for faster exposure and gain
-        sensor = cfg.get_device().first_color_sensor()
-        sensor.set_option(rs.option.enable_auto_exposure, 0)
-        sensor.set_option(rs.option.white_balance, 3000)
-        sensor.set_option(
-            rs.option.exposure, 30
-        )  # Lower value for faster exposure (try 1-20)
-        sensor.set_option(
-            rs.option.gain, 64
-        )  # Increase gain if image is too dark (try 16-64)
+
 
         self.idx = 0
         self.image = None
