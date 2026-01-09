@@ -1,4 +1,5 @@
 import rclpy
+import cv2
 from rclpy.node import Node
 from ros2_realsense.RealSenseCapture import RealsenseCapture
 
@@ -9,6 +10,8 @@ Saves images to disk and optionally displays them in a window.
 
 Usage:
     ros2 run ros2_realsense ros2_realsense --ros-args -p show_frame:=True -p save_frame:=True -p out_dir:=./out/test
+    
+    Alternatively, parameters set parameter during run time.
 """
 
 
@@ -29,12 +32,8 @@ class RealsenseNode(Node):
         # Create RealsenseCapture object
         self.realsense = RealsenseCapture(out_dir=out_dir)
         
-        # Store parameters for use in callback
-        self.show_frame = show_frame
-        self.save_frame = save_frame
-        
         # Create timer for periodic capture (e.g., 60 Hz)
-        self.timer_period = 1.0 / 100.0  # seconds
+        self.timer_period = 1.0 / 60.0  # seconds
         self.timer = self.create_timer(self.timer_period, self.timer_callback)
         
         self.t0 = None
@@ -48,17 +47,40 @@ class RealsenseNode(Node):
 
         # Call capture with time and index
         try:
-            image, capture_time = self.realsense.capture(show_frame=self.show_frame)
-            if self.t0 is None:
-                self.t0 = self.get_clock().now().nanoseconds / 1e9  # seconds
-        
-            # Get ROS2 time
-            current_time = self.get_clock().now().nanoseconds / 1e9 # Convert to seconds
-            timestamp = current_time - self.t0  # relative time since start
+            image, capture_time = self.realsense.capture()
+            
+            timestamp = 0        
 
-            # Save image if required
-            if self.save_frame:
+            # Save image (raw) if requested 
+            if self.get_parameter('save_frame').value:
+                if self.t0 is None:
+                    self.get_logger().info('Start saving frames to disk.')
+                    self.t0 = self.get_clock().now().nanoseconds / 1e9  # seconds
+        
+                # Get ROS2 time
+                current_time = self.get_clock().now().nanoseconds / 1e9 # Convert to seconds
+                timestamp = current_time - self.t0  # relative time since start
+
                 self.realsense.save_image(timestamp, self.capture_idx, image)
+                
+            # Display frame if requested (minimal overhead)
+            if self.get_parameter('show_frame').value:
+                
+                # add time stamp to image
+                formatted_timestamp = f"{int(timestamp*1e3):04d}"
+                cv2.putText(
+                    image,
+                    f"Time: {formatted_timestamp} ms",
+                    (20, 30),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    1.0,
+                    (255, 255, 255),
+                    1,
+                    cv2.LINE_AA,
+                )
+                
+                cv2.imshow("RealSense", image)
+                cv2.waitKey(1)
 
             self.capture_idx += 1
         except Exception as e:

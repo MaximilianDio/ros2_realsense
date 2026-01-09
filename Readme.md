@@ -4,7 +4,7 @@
 
 install required packages:
 ```bash
-python3 -m pip install ./src/ros2_realsense/requirements.txt
+python3 -m pip install -r ./src/ros2_realsense/requirements.txt
 ```
 
 ## ros build

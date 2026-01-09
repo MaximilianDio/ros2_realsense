@@ -44,8 +44,8 @@ class RealsenseCapture:
         sensor = cfg.get_device().first_color_sensor()
         sensor.set_option(rs.option.enable_auto_exposure, 0)  # Disable auto-exposure for consistent timing
         sensor.set_option(rs.option.white_balance, 3000)
-        sensor.set_option(rs.option.exposure, 30)  # Fast exposure (1-20ms range)
-        sensor.set_option(rs.option.gain, 64)  # Compensate for low exposure
+        sensor.set_option(rs.option.exposure, 20)  # Fast exposure (1-20ms range)
+        sensor.set_option(rs.option.gain, 128)  # Compensate for low exposure
         
         # Extract and save camera intrinsics
         self.intr = cfg.get_stream(rs.stream.color).as_video_stream_profile().get_intrinsics()
@@ -58,13 +58,10 @@ class RealsenseCapture:
         np.savetxt(os.path.join(self.out_dir, "camera_matrix.txt"), self.mtx)
         np.savetxt(os.path.join(self.out_dir, "dist_coeffs.txt"), self.dist)
 
-    def capture(self, show_frame):
+    def capture(self):
         """
         Capture a single frame from the camera.
         
-        Args:
-            show_frame: Whether to display the captured frame
-            
         Returns:
             tuple: (image array, timestamp in ms)
         """
@@ -77,11 +74,6 @@ class RealsenseCapture:
             # Zero-copy conversion to numpy array
             image = np.asanyarray(frame.get_data())
 
-            # Display frame if requested (minimal overhead)
-            if show_frame:
-                cv2.imshow("RealSense", image)
-                cv2.waitKey(1)
-            
             return image, capture_time
         else:
             print("Frame is invalid or dropped.")
