@@ -2,7 +2,7 @@ import cv2
 import os
 import numpy as np
 from natsort import natsorted
-import sys
+from RealsensePoseEstimator import ArucoPose
 
 """
 Generate a video from a sequence of images stored in a folder.
@@ -13,6 +13,17 @@ Usage:
     - output_video: Path for output video file
     - fps: (optional) Frames per second (default: 30)
 """
+
+def object_pose(rvec, tvec, M_T_C):
+    T_M = np.eye(4) # Transformation matrix of marker in world frame
+    R = cv2.Rodrigues(rvec)[0]
+    T_M[0:3, 0:3] = R
+    T_M[0:3, 3] = tvec.flatten()
+    
+    T_C = T_M @ M_T_C
+    rvec_C, _ = cv2.Rodrigues(T_C[0:3, 0:3])
+    tvec_C = T_C[0:3, 3].reshape((3, 1))
+    return rvec_C, tvec_C
 
 
 def generate_video_from_images(image_folder, output_video, fps=30):
@@ -30,7 +41,7 @@ def generate_video_from_images(image_folder, output_video, fps=30):
     ]
 
     # there are multiple images with 0 and end timestamp, so we remove duplicates
-    idx_first = next(i for i, v in enumerate(images_timestamps) if v != 0) - 1
+    idx_first = max(0,next(i for i, v in enumerate(images_timestamps) if v != 0) - 1)
     idx_last = next(
         i for i, v in enumerate(images_timestamps) if v == images_timestamps[-1]
     )
@@ -61,9 +72,43 @@ def generate_video_from_images(image_folder, output_video, fps=30):
     prev_frame = None
     prev_time = None  # in milliseconds
 
+    intrinsics = np.loadtxt("out/test_camera_images/camera_matrix.txt")
+    dist = np.loadtxt("out/test_camera_images/dist_coeffs.txt")
+
+    aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
+    parameters = cv2.aruco.DetectorParameters()
+
+    detector = cv2.aruco.ArucoDetector(aruco_dict, parameters)
+
+    aruco_pose = ArucoPose(intrinsics, dist, detector, marker_length=0.04)
+
+    # transformation from marker to object (example values)
+    M_T_C = np.array([[1, 0, 0, 0.18],
+                    [0, 1, 0, 0.00], 
+                    [0, 0, 1, -0.05],
+                    [0, 0, 0, 1]])
+    
+    t_vec_C_list = []
+
     for image, t_ist in images_timestamped:
         image_path = os.path.join(image_folder, image)
         frame = cv2.imread(image_path)
+
+
+        corners, ids, success, (rvec_M, tvec_M) = aruco_pose.get_pose(frame)
+
+        frame = cv2.aruco.drawDetectedMarkers(frame, corners, ids)
+
+        rvec_C, tvec_C = object_pose(rvec_M, tvec_M, M_T_C)
+        cv2.drawFrameAxes(frame, intrinsics, dist, rvec_C, tvec_C, 0.03)
+
+        t_vec_C_list.append(tvec_M)
+
+        # 3d projection of t_vec_C
+        for i in range(1, len(t_vec_C_list)):
+            p1, _ = cv2.projectPoints(t_vec_C_list[i-1], np.zeros((3,1)), np.zeros((3,1)), intrinsics, dist)
+            p2, _ = cv2.projectPoints(t_vec_C_list[i], np.zeros((3,1)), np.zeros((3,1)), intrinsics, dist)
+            cv2.line(frame, (int(p1[0][0][0]), int(p1[0][0][1])), (int(p2[0][0][0]), int(p2[0][0][1])), (0, 255, 0), 2)
 
         # overlay timestamp
         formatted_timestamp = f"{int(t_ist):04d}"
@@ -103,6 +148,9 @@ def generate_video_from_images(image_folder, output_video, fps=30):
         prev_frame = frame
         prev_time = t_ist
 
+        cv2.imshow("Annotated Image", frame)
+        cv2.waitKey(1)
+
     # Write the final frame once
     video.write(prev_frame)
 
@@ -111,16 +159,10 @@ def generate_video_from_images(image_folder, output_video, fps=30):
 
 
 def main(args=None):
-    if len(sys.argv) < 3:
-        print("Usage: generate_video <image_folder> <output_video> [fps]")
-        print("  image_folder: Path to folder containing .png images")
-        print("  output_video: Path for output video file")
-        print("  fps: (optional) Frames per second (default: 30)")
-        sys.exit(1)
     
-    image_folder = sys.argv[1]
-    output_video = sys.argv[2]
-    fps = int(sys.argv[3]) if len(sys.argv) > 3 else 30
+    image_folder = "out/test_camera_images"
+    output_video = "out/video_output.mp4"
+    fps = 60
 
     print(f"Generating video from images in {image_folder}...")
     generate_video_from_images(image_folder, output_video, fps)

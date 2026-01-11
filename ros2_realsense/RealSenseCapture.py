@@ -2,14 +2,8 @@ import os
 import cv2
 import time
 import numpy as np
-import psutil
 import multiprocessing as mp
 
-def print_memory_usage():
-    """Print current process memory usage in MB."""
-    process = psutil.Process(os.getpid())
-    memory_info = process.memory_info()
-    print(f"Memory Usage: {memory_info.rss / 1024 / 1024:.2f} MB")
 
 class RealsenseCapture:
     """Handle RealSense camera capture and configuration."""
@@ -44,7 +38,7 @@ class RealsenseCapture:
         sensor = cfg.get_device().first_color_sensor()
         sensor.set_option(rs.option.enable_auto_exposure, 0)  # Disable auto-exposure for consistent timing
         sensor.set_option(rs.option.white_balance, 3000)
-        sensor.set_option(rs.option.exposure, 20)  # Fast exposure (1-20ms range)
+        sensor.set_option(rs.option.exposure, 25)  # Fast exposure (1-20ms range)
         sensor.set_option(rs.option.gain, 128)  # Compensate for low exposure
         
         # Extract and save camera intrinsics
@@ -110,17 +104,36 @@ def start_capture_loop(stop_event, clock, out_dir, show_frame, save_frame):
     """
     camera = RealsenseCapture(out_dir=out_dir)
     idx = 0
-    
     while not stop_event.is_set():
+
         try:
             # Capture frame
-            image, capture_time = camera.capture(show_frame)
+            image, capture_time = camera.capture()
             
             if image is not None:
+
                 # Save to disk if requested
                 if save_frame:
-                    camera.save_image(capture_time, idx, image)
+                    camera.save_image(clock.value, idx, image)
                 idx += 1
+
+                                # Display frame if requested
+                if show_frame:
+                    # add time stamp to image
+                    formatted_timestamp = f"{int(clock.value*1e3):04d}"
+                    cv2.putText(
+                        image,
+                        f"Time: {formatted_timestamp} ms",
+                        (20, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        1.0,
+                        (255, 255, 255),
+                        1,
+                        cv2.LINE_AA,
+                    )
+                    
+                    cv2.imshow("RealSense", image)
+                    cv2.waitKey(1)
                 
         except Exception as e:
             print(f"Error during capture: {e}")
