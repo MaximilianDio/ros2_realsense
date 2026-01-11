@@ -3,6 +3,7 @@ import os
 import numpy as np
 from natsort import natsorted
 from RealsensePoseEstimator import ArucoPose
+import argparse
 
 """
 Generate a video from a sequence of images stored in a folder.
@@ -13,6 +14,8 @@ Usage:
     - output_video: Path for output video file
     - fps: (optional) Frames per second (default: 30)
 """
+
+marker_length = 0.1
 
 def object_pose(rvec, tvec, M_T_C):
     T_M = np.eye(4) # Transformation matrix of marker in world frame
@@ -72,20 +75,20 @@ def generate_video_from_images(image_folder, output_video, fps=30):
     prev_frame = None
     prev_time = None  # in milliseconds
 
-    intrinsics = np.loadtxt("out/test_camera_images/camera_matrix.txt")
-    dist = np.loadtxt("out/test_camera_images/dist_coeffs.txt")
+    intrinsics = np.loadtxt(image_folder + "/camera_matrix.txt")
+    dist = np.loadtxt(image_folder + "/dist_coeffs.txt")
 
     aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
     parameters = cv2.aruco.DetectorParameters()
 
     detector = cv2.aruco.ArucoDetector(aruco_dict, parameters)
 
-    aruco_pose = ArucoPose(intrinsics, dist, detector, marker_length=0.04)
+    aruco_pose = ArucoPose(intrinsics, dist, detector, marker_length=marker_length)
 
     # transformation from marker to object (example values)
-    M_T_C = np.array([[1, 0, 0, 0.18],
-                    [0, 1, 0, 0.00], 
-                    [0, 0, 1, -0.05],
+    M_T_C = np.array([[1, 0, 0, 0.0],
+                    [0, 1, 0, 0.0], 
+                    [0, 0, 1, 0.0],
                     [0, 0, 0, 1]])
     
     t_vec_C_list = []
@@ -94,16 +97,19 @@ def generate_video_from_images(image_folder, output_video, fps=30):
         image_path = os.path.join(image_folder, image)
         frame = cv2.imread(image_path)
 
+        try:
+            # detect aruco markers and estimate pose
+            corners, ids, success, (rvec_M, tvec_M) = aruco_pose.get_pose(frame)
 
-        corners, ids, success, (rvec_M, tvec_M) = aruco_pose.get_pose(frame)
+            frame = cv2.aruco.drawDetectedMarkers(frame, corners, ids)
+            # draw axis
+            rvec_C, tvec_C = object_pose(rvec_M, tvec_M, M_T_C)
+            cv2.drawFrameAxes(frame, intrinsics, dist, rvec_C, tvec_C, marker_length/2)
 
-        frame = cv2.aruco.drawDetectedMarkers(frame, corners, ids)
-
-        rvec_C, tvec_C = object_pose(rvec_M, tvec_M, M_T_C)
-        cv2.drawFrameAxes(frame, intrinsics, dist, rvec_C, tvec_C, 0.03)
-
-        t_vec_C_list.append(tvec_M)
-
+            t_vec_C_list.append(tvec_M)
+        except:
+            pass
+    
         # 3d projection of t_vec_C
         for i in range(1, len(t_vec_C_list)):
             p1, _ = cv2.projectPoints(t_vec_C_list[i-1], np.zeros((3,1)), np.zeros((3,1)), intrinsics, dist)
@@ -158,15 +164,18 @@ def generate_video_from_images(image_folder, output_video, fps=30):
     print(f"Video saved as {output_video}")
 
 
-def main(args=None):
+if __name__ == "__main__":
+
+    parser = argparse.ArgumentParser(description="RealSense camera capture with optional display and saving")
+    parser.add_argument("--out-dir", type=str, default="test_camera_images", help="Output directory for images")
+    parser.add_argument("--show-frame", action="store_true", default=False, help="Display captured frames")
+    parser.add_argument("--save-frame", action="store_true", default=True, help="Save frames to disk")
     
-    image_folder = "out/test_camera_images"
-    output_video = "out/video_output.mp4"
+    args = parser.parse_args()
+    
+    image_folder = "out/" + args.out_dir
+    output_video = "out/" + "/ "+args.out_dir+ "_output_video.mp4"
     fps = 60
 
     print(f"Generating video from images in {image_folder}...")
     generate_video_from_images(image_folder, output_video, fps)
-
-
-if __name__ == "__main__":
-    main()

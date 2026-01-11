@@ -3,7 +3,8 @@ import cv2
 import time
 import numpy as np
 import multiprocessing as mp
-
+import argparse
+import pyrealsense2 as rs
 
 class RealsenseCapture:
     """Handle RealSense camera capture and configuration."""
@@ -15,7 +16,6 @@ class RealsenseCapture:
         Args:
             out_dir: Output directory for saving images and camera parameters
         """
-        import pyrealsense2 as rs
 
         # Setup output directory
         self.out_dir = os.path.join(os.getcwd(), out_dir)
@@ -30,7 +30,7 @@ class RealsenseCapture:
         self.pipe = rs.pipeline()
         config = rs.config()
         config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 60)  
-        # config.enable_stream(rs.stream.color, 960, 540, rs.format.bgr8, 60)  
+        #config.enable_stream(rs.stream.color, 960, 540, rs.format.bgr8, 60)  
         # config.enable_stream(rs.stream.color, 1920, 1080, rs.format.bgr8, 30 ) 
         cfg = self.pipe.start(config)
          
@@ -109,6 +109,9 @@ def start_capture_loop(stop_event, clock, out_dir, show_frame, save_frame):
         try:
             # Capture frame
             image, capture_time = camera.capture()
+
+            # print current clock time and capture time
+            print(f"Clock: {clock.value:.3f} s, Capture Time: {capture_time:.3f} ms", end='\r')
             
             if image is not None:
 
@@ -174,14 +177,22 @@ class RealSenseCaptureExecutor:
             self.process.terminate()
 
 if __name__ == "__main__":
+    
+    parser = argparse.ArgumentParser(description="RealSense camera capture with optional display and saving")
+    parser.add_argument("--out-dir", type=str, default="test_camera_images", help="Output directory for images")
+    parser.add_argument("--show-frame", action="store_true", default=False, help="Display captured frames")
+    parser.add_argument("--save-frame", action="store_true", default=False, help="Save frames to disk")
+    
+    args = parser.parse_args()
+    
     # Shared clock for synchronization across processes
     clock = mp.Value('d', 0.0)
     
     with RealSenseCaptureExecutor(
         clock=clock, 
-        out_dir="out/test_camera_images", 
-        show_frame=True, 
-        save_frame=True
+        out_dir="out/" + args.out_dir, 
+        show_frame=args.show_frame, 
+        save_frame=args.save_frame
     ) as executor:
         t0 = time.time()
         try:
