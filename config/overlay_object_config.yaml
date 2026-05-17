@@ -1,0 +1,8 @@
+calibration:
+  directory: calibration_out  # must contain T_tracker_camera.txt, camera_matrix.txt, dist_coeffs.txt
+
+object:
+  axis_length: 0.15    # total arrow length in meters
+  shaft_radius: 0.03   # fraction of axis_length for the shaft diameter
+  tip_radius: 0.08     # fraction of axis_length for the arrowhead diameter
+  tip_length: 0.20     # fraction of axis_length for the arrowhead length

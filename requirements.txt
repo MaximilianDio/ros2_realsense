@@ -3,3 +3,4 @@ pyrealsense2
 filterpy
 numpy
 natsort
+pyvista

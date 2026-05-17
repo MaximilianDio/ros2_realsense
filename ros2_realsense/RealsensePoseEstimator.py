@@ -8,7 +8,7 @@ import pickle as pkl
 from filterpy.kalman import KalmanFilter
 from filterpy.common import Q_discrete_white_noise
 
-from ros2_realsense.RealSenseCapture import RealsenseCapture
+from RealSenseCapture import RealsenseCapture
 
 
 def object_pose(rvec, tvec, O_T_C):
