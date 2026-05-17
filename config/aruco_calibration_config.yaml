@@ -1,0 +1,16 @@
+aruco:
+  dictionary: DICT_4X4_50  # OpenCV ArUco dictionary name
+  marker_id: 0              # ID of the marker to detect
+  marker_length: 0.10       # Side length in meters
+
+output:
+  directory: calibration_out
+  min_samples: 20           # Number of pose pairs before auto-solve
+  save_images: true         # Save annotated images alongside each captured pair
+
+capture:
+  translation_threshold: 0.05   # m   — min translation from last captured pose
+  rotation_threshold_deg: 10.0  # deg — min rotation from last captured pose
+  static_duration: 1.0          # s   — camera must be still for this long before capturing
+  static_translation_tol: 0.003 # m   — max motion considered "static"
+  static_rotation_tol_deg: 0.5  # deg — max rotation considered "static"

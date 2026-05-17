@@ -28,6 +28,8 @@ setup(
         'console_scripts': [
             'ros2_realsense = ros2_realsense.ros2_realsense:main',
             'generate_video = ros2_realsense.generate_video:main',
+            'aruco_calibration = ros2_realsense.aruco_calibration_node:main',
+            'overlay_object = ros2_realsense.overlay_object:main',
         ],
     },
 )
