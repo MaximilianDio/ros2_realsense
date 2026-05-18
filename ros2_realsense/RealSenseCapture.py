@@ -129,7 +129,7 @@ class AsyncImageWriter:
         self._pool.shutdown(wait=False)
 
 
-def start_capture_loop(stop_event, clock, out_dir, show_frame, save_frame):
+def start_capture_loop(stop_event, clock, out_dir, show_frame, save_frame, width, height, fps):
     """
     Main capture loop running in separate process.
     
@@ -140,7 +140,7 @@ def start_capture_loop(stop_event, clock, out_dir, show_frame, save_frame):
         show_frame: Whether to display frames
         save_frame: Whether to save frames to disk
     """
-    camera = RealsenseCapture(out_dir=out_dir)
+    camera = RealsenseCapture(out_dir=out_dir, width=width, height=height, fps=fps)
     writer = AsyncImageWriter(out_dir=camera.out_dir) if save_frame else None
     idx = 0
     clock0 = clock.value
@@ -247,7 +247,7 @@ if __name__ == "__main__":
         save_frame=args.save_frame,
         width=960,
         height=540,
-        fps=30
+        fps=60
     ) as executor:
         t0 = time.time()
         try:
