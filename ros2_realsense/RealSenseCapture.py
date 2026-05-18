@@ -9,7 +9,7 @@ import pyrealsense2 as rs
 class RealsenseCapture:
     """Handle RealSense camera capture and configuration."""
     
-    def __init__(self, out_dir):
+    def __init__(self, out_dir, width=640, height=480, fps=60):
         """
         Initialize RealSense camera with optimized settings.
         
@@ -29,10 +29,14 @@ class RealsenseCapture:
         # Configure and start pipeline
         self.pipe = rs.pipeline()
         config = rs.config()
-        # config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, 60)  
-        #config.enable_stream(rs.stream.color, 960, 540, rs.format.bgr8, 60)  
-        config.enable_stream(rs.stream.color, 1920, 1080, rs.format.bgr8, 30 ) 
-        cfg = self.pipe.start(config)
+        config.enable_stream(rs.stream.color, width, height, rs.format.bgr8, fps)  
+        try:
+            cfg = self.pipe.start(config)
+        except RuntimeError as e:
+            print(f"Error configuring RealSense stream: {e}")
+            raise
+
+        
          
         # Optimize camera settings for low latency
         sensor = cfg.get_device().first_color_sensor()

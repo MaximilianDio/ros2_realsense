@@ -73,7 +73,7 @@ class ArucoCalibrationNode(Node):
         self._static_rot_tol = float(np.deg2rad(cap_cfg.get("static_rotation_tol_deg", 0.5)))
 
         # Camera init
-        self._camera = RealsenseCapture(out_dir=self._out_dir)
+        self._camera = RealsenseCapture(out_dir=self._out_dir, width=1920, height=1080, fps=6)
 
         # Shared state
         self._lock = threading.Lock()

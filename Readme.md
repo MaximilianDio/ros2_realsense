@@ -16,6 +16,14 @@ colcon build --symlink-install --packages-select ros2_realsense
 
 # Usage
 
+## calibration
+
+run the ros2 node to perform camera calibration:
+```bash
+ros2 run ros2_realsense aruco_calibration \
+  --ros-args -p config_file:=/workspaces/src/ros2_realsense/config/aruco_calibration_config.yaml
+```
+
 ## create images
 
 run the ros2 node to capture images from the RealSense camera:

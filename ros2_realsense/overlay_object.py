@@ -206,30 +206,37 @@ class OverlayObjectNode(Node):
         with open(config_path) as f:
             cfg = yaml.safe_load(f)
 
-        # Load calibration files
-        cal_dir = os.path.join(os.getcwd(), cfg["calibration"]["directory"])
-        self._T_t_c = np.loadtxt(os.path.join(cal_dir, "T_tracker_camera.txt"))
-        mtx = np.loadtxt(os.path.join(cal_dir, "camera_matrix.txt"))
-        dist = np.loadtxt(os.path.join(cal_dir, "dist_coeffs.txt"))
-
         # Overlay
+        width = 960
+        height = 540
+        fps = 60
+        
+        cal_dir = os.path.join(os.getcwd(), cfg["calibration"]["directory"])
+        
+        # Camera
+        # generates camera_matrix and dist_coeffs
+        self._camera = RealsenseCapture(out_dir=os.path.join(cal_dir, "overlay_frames"), width = width, height=height, fps=fps)
+        self._frame_queue: queue.Queue = queue.Queue(maxsize=5)
+        self._stop_event = threading.Event()
+        self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
+        self._capture_thread.start()
+        
+        # Load calibration files
+        
+        self._T_t_c = np.loadtxt(os.path.join(cal_dir, "T_tracker_camera.txt"))
+        mtx = np.loadtxt(os.path.join(cal_dir, "overlay_frames", "camera_matrix.txt"))
+        dist = np.loadtxt(os.path.join(cal_dir, "overlay_frames", "dist_coeffs.txt"))
+        
         obj_cfg = cfg["object"]
         self._overlay = FrameOverlay(
-            width=1920,
-            height=1080,
+            width=width,
+            height=height,
             mtx=mtx,
             axis_length=float(obj_cfg.get("axis_length", 0.1)),
             shaft_radius=float(obj_cfg.get("shaft_radius", 0.03)),
             tip_radius=float(obj_cfg.get("tip_radius", 0.08)),
             tip_length=float(obj_cfg.get("tip_length", 0.20)),
         )
-
-        # Camera
-        self._camera = RealsenseCapture(out_dir=os.path.join(cal_dir, "overlay_frames"))
-        self._frame_queue: queue.Queue = queue.Queue(maxsize=5)
-        self._stop_event = threading.Event()
-        self._capture_thread = threading.Thread(target=self._capture_loop, daemon=True)
-        self._capture_thread.start()
 
         # Shared tracker state
         self._lock = threading.Lock()
@@ -252,10 +259,10 @@ class OverlayObjectNode(Node):
         self._bridge = CvBridge()
         self._image_pub = self.create_publisher(Image, "~/image", 1)
 
-        self.create_timer(1.0 / 30.0, self._update_callback)
+        self.create_timer(1.0 / fps, self._update_callback)
 
         self.get_logger().info(
-            f"Overlay node ready. Publishing to ~/image at 30 Hz.\n"
+            f"Overlay node ready. Publishing to ~/image at {fps} Hz.\n"
             f"  T^t_c loaded from {cal_dir}\n"
         )
 
