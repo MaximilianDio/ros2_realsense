@@ -143,6 +143,7 @@ def start_capture_loop(stop_event, clock, out_dir, show_frame, save_frame):
     camera = RealsenseCapture(out_dir=out_dir)
     writer = AsyncImageWriter(out_dir=camera.out_dir) if save_frame else None
     idx = 0
+    clock0 = clock.value
     while not stop_event.is_set():
 
         try:
@@ -150,8 +151,9 @@ def start_capture_loop(stop_event, clock, out_dir, show_frame, save_frame):
             image, capture_time = camera.capture()
 
             # print current clock time and capture time
-            print(f"Clock: {clock.value:.3f} s, Capture Time: {capture_time:.3f} ms", end='\r')
 
+            print(f"Clock: {clock.value:.3f} s, Capture Time: {capture_time:.3f} ms, fps: {idx/(clock.value-clock0)}", end='\r')
+            
             if image is not None:
 
                 # Submit to async writer — returns in < 0.1 ms
@@ -197,7 +199,8 @@ def start_capture_loop(stop_event, clock, out_dir, show_frame, save_frame):
 class RealSenseCaptureExecutor:
     """Context manager for running camera capture in separate process."""
     
-    def __init__(self, clock, out_dir, show_frame=False, save_frame=True):
+    def __init__(self, clock, out_dir, show_frame=False, save_frame=True,
+                 width = 1920, height = 1080, fps = 30):
         """
         Initialize capture executor.
         
@@ -210,7 +213,7 @@ class RealSenseCaptureExecutor:
         self.stop_event = mp.Event()
         self.process = mp.Process(
             target=start_capture_loop, 
-            args=(self.stop_event, clock, out_dir, show_frame, save_frame)
+            args=(self.stop_event, clock, out_dir, show_frame, save_frame, width, height, fps)
         )
 
     def __enter__(self):
@@ -241,7 +244,10 @@ if __name__ == "__main__":
         clock=clock, 
         out_dir="out/" + args.out_dir, 
         show_frame=args.show_frame, 
-        save_frame=args.save_frame
+        save_frame=args.save_frame,
+        width=960,
+        height=540,
+        fps=30
     ) as executor:
         t0 = time.time()
         try:
