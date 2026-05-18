@@ -4,6 +4,7 @@ import time
 import numpy as np
 import multiprocessing as mp
 import argparse
+from concurrent.futures import ThreadPoolExecutor
 import pyrealsense2 as rs
 
 class RealsenseCapture:
@@ -80,20 +81,53 @@ class RealsenseCapture:
     def save_image(self, time, idx, image):
         """
         Save image to disk with timestamp in filename.
-        
+
         Args:
             time: Timestamp for filename
             idx: Frame index
             image: Image array to save
         """
-        filename = f"image_{idx:04d}_{time:.3f}.png"
+        filename = f"image_{idx:04d}_{time:.3f}.jpg"
         image_filename = os.path.join(self.out_dir, filename)
-        cv2.imwrite(image_filename, image)
+        cv2.imwrite(image_filename, image, [cv2.IMWRITE_JPEG_QUALITY, 95])
 
     def stop(self):
         """Stop the RealSense pipeline and release resources."""
         self.pipe.stop()
         cv2.destroyAllWindows()  # Clean up any open windows
+
+class AsyncImageWriter:
+    """
+    Decouples disk writes from the capture thread using a thread pool.
+
+    The capture thread calls submit() which returns in < 0.1 ms; worker
+    threads handle JPEG compression and disk I/O in the background.
+    """
+
+    def __init__(self, out_dir, num_workers=2):
+        self._out_dir = out_dir
+        self._pool = ThreadPoolExecutor(max_workers=num_workers)
+        self._futures = []
+
+    def submit(self, idx, timestamp, image):
+        """Enqueue a frame for writing. Returns immediately."""
+        future = self._pool.submit(self._write, idx, timestamp, image.copy())
+        self._futures.append(future)
+
+    def _write(self, idx, timestamp, image):
+        path = os.path.join(self._out_dir, f"image_{idx:04d}_{timestamp:.3f}.jpg")
+        cv2.imwrite(path, image, [cv2.IMWRITE_JPEG_QUALITY, 95])
+
+    def pending(self):
+        """Return number of writes not yet completed."""
+        return sum(1 for f in self._futures if not f.done())
+
+    def flush(self):
+        """Block until all queued writes are complete."""
+        for f in self._futures:
+            f.result()
+        self._pool.shutdown(wait=False)
+
 
 def start_capture_loop(stop_event, clock, out_dir, show_frame, save_frame):
     """
@@ -107,6 +141,7 @@ def start_capture_loop(stop_event, clock, out_dir, show_frame, save_frame):
         save_frame: Whether to save frames to disk
     """
     camera = RealsenseCapture(out_dir=out_dir)
+    writer = AsyncImageWriter(out_dir=camera.out_dir) if save_frame else None
     idx = 0
     while not stop_event.is_set():
 
@@ -116,15 +151,22 @@ def start_capture_loop(stop_event, clock, out_dir, show_frame, save_frame):
 
             # print current clock time and capture time
             print(f"Clock: {clock.value:.3f} s, Capture Time: {capture_time:.3f} ms", end='\r')
-            
+
             if image is not None:
 
-                # Save to disk if requested
+                # Submit to async writer — returns in < 0.1 ms
                 if save_frame:
-                    camera.save_image(clock.value, idx, image)
+                    writer.submit(idx, clock.value, image)
+
+                    # Warn if writer is falling behind
+                    if idx % 30 == 0:
+                        pending = writer.pending()
+                        if pending > 60:
+                            print(f"\n[WARN] Writer backlog: {pending} frames pending")
+
                 idx += 1
 
-                                # Display frame if requested
+                # Display frame if requested
                 if show_frame:
                     # add time stamp to image
                     formatted_timestamp = f"{int(clock.value*1e3):04d}"
@@ -138,14 +180,17 @@ def start_capture_loop(stop_event, clock, out_dir, show_frame, save_frame):
                         1,
                         cv2.LINE_AA,
                     )
-                    
+
                     cv2.imshow("RealSense", image)
                     cv2.waitKey(1)
-                
+
         except Exception as e:
             print(f"Error during capture: {e}")
             break
 
+    if save_frame:
+        print(f"\nFlushing {writer.pending()} pending writes...")
+        writer.flush()
     print(f"Capture loop ended: {idx} frames captured")
     camera.stop()
 
