@@ -10,22 +10,13 @@ import pyrealsense2 as rs
 class RealsenseCapture:
     """Handle RealSense camera capture and configuration."""
     
-    def __init__(self, out_dir, width=640, height=480, fps=60):
+    def __init__(self, out_dir=None, width=640, height=480, fps=60):
         """
         Initialize RealSense camera with optimized settings.
         
         Args:
             out_dir: Output directory for saving images and camera parameters
         """
-
-        # Setup output directory
-        self.out_dir = os.path.join(os.getcwd(), out_dir)
-        os.makedirs(self.out_dir, exist_ok=True)
-        
-        # Clear existing files (more efficient with pathlib or direct iteration)
-        for file in os.scandir(self.out_dir):
-            if file.is_file():
-                os.unlink(file.path)
 
         # Configure and start pipeline
         self.pipe = rs.pipeline()
@@ -53,9 +44,19 @@ class RealsenseCapture:
                              [0, 0, 1]])
         self.dist = np.array(self.intr.coeffs)
 
-        # Save calibration parameters once during initialization
-        np.savetxt(os.path.join(self.out_dir, "camera_matrix.txt"), self.mtx)
-        np.savetxt(os.path.join(self.out_dir, "dist_coeffs.txt"), self.dist)
+        # Setup output directory
+        if out_dir is not None:
+            self.out_dir = os.path.join(os.getcwd(), out_dir)
+            os.makedirs(self.out_dir, exist_ok=True)
+            
+            # Clear existing files (more efficient with pathlib or direct iteration)
+            for file in os.scandir(self.out_dir):
+                if file.is_file():
+                    os.unlink(file.path)
+
+            # Save calibration parameters once during initialization
+            np.savetxt(os.path.join(self.out_dir, "camera_matrix.txt"), self.mtx)
+            np.savetxt(os.path.join(self.out_dir, "dist_coeffs.txt"), self.dist)
 
     def capture(self):
         """
@@ -140,10 +141,13 @@ def start_capture_loop(stop_event, clock, out_dir, show_frame, save_frame, width
         show_frame: Whether to display frames
         save_frame: Whether to save frames to disk
     """
+    if not save_frame:
+        out_dir = None  # Disable output directory if not saving frames
     camera = RealsenseCapture(out_dir=out_dir, width=width, height=height, fps=fps)
     writer = AsyncImageWriter(out_dir=camera.out_dir) if save_frame else None
     idx = 0
     clock0 = clock.value
+    print("Starting capture loop...")
     while not stop_event.is_set():
 
         try:
@@ -152,7 +156,7 @@ def start_capture_loop(stop_event, clock, out_dir, show_frame, save_frame, width
 
             # print current clock time and capture time
 
-            print(f"Clock: {clock.value:.3f} s, Capture Time: {capture_time:.3f} ms, fps: {idx/(clock.value-clock0)}", end='\r')
+            # print(f"Clock: {clock.value:.3f} s, Capture Time: {capture_time:.3f} ms, fps: {idx/(clock.value-clock0)}", end='\r')
             
             if image is not None:
 
@@ -240,6 +244,18 @@ if __name__ == "__main__":
     # Shared clock for synchronization across processes
     clock = mp.Value('d', 0.0)
     
+    # YUY2 [16 bits] 
+    # width x height | fps options for D415/D435/D435i:
+    # 1920x1080 | 6,15,30 
+    # 1280x720  | 6,15,30 
+    # 960x540   | 6,15,30,60 
+    # 848x480   | 6,15,30,60 
+    # 640x480   | 6,15,30,60 
+    # 640x360   | 6,15,30,60 
+    # 424x240   | 6,15,30,60 
+    # 320x240   | 6,30,60 
+    # 320x180   | 6,30,60
+
     with RealSenseCaptureExecutor(
         clock=clock, 
         out_dir="out/" + args.out_dir, 
