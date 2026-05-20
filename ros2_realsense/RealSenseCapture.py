@@ -1,4 +1,5 @@
 import os
+import shutil
 import cv2
 import time
 import numpy as np
@@ -33,9 +34,9 @@ class RealsenseCapture:
         # Optimize camera settings for low latency
         sensor = cfg.get_device().first_color_sensor()
         sensor.set_option(rs.option.enable_auto_exposure, 0)  # Disable auto-exposure for consistent timing
-        sensor.set_option(rs.option.white_balance, 3000)
-        sensor.set_option(rs.option.exposure, 25)  # Fast exposure (1-20ms range)
-        sensor.set_option(rs.option.gain, 128)  # Compensate for low exposure
+        sensor.set_option(rs.option.white_balance, 3300)
+        sensor.set_option(rs.option.exposure, 64)  # Fast exposure (1-20ms range)
+        sensor.set_option(rs.option.gain, 32)  # Compensate for low exposure
         
         # Extract and save camera intrinsics
         self.intr = cfg.get_stream(rs.stream.color).as_video_stream_profile().get_intrinsics()
@@ -272,3 +273,18 @@ if __name__ == "__main__":
                 time.sleep(0.001)  # 1ms sleep for ~1kHz clock update
         except KeyboardInterrupt:
             print("\nShutting down...")
+
+    src_dir = os.path.join(os.getcwd(), "out", args.out_dir)
+    dest_dir = os.path.join(
+        r"Z:\Forschung\Robotik\2022_2026_DFG_Kooperative_Manipulation\05_Ergebnisse\01_Messungen\avp",
+        args.out_dir, "images"
+    )
+    print(f"copying the generated images to {dest_dir} ... This can take a while ...")
+    os.makedirs(dest_dir, exist_ok=True)
+    for f in os.scandir(dest_dir):
+        if f.is_file():
+            os.unlink(f.path)
+    for f in os.scandir(src_dir):
+        if f.is_file():
+            shutil.copy(f.path, dest_dir)
+    print(f"Moved images from {src_dir} to {dest_dir}")
