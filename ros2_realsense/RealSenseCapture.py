@@ -7,6 +7,7 @@ import multiprocessing as mp
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 import pyrealsense2 as rs
+from tqdm import tqdm
 
 class RealsenseCapture:
     """Handle RealSense camera capture and configuration."""
@@ -35,8 +36,8 @@ class RealsenseCapture:
         sensor = cfg.get_device().first_color_sensor()
         sensor.set_option(rs.option.enable_auto_exposure, 0)  # Disable auto-exposure for consistent timing
         sensor.set_option(rs.option.white_balance, 3300)
-        sensor.set_option(rs.option.exposure, 64)  # Fast exposure (1-20ms range)
-        sensor.set_option(rs.option.gain, 32)  # Compensate for low exposure
+        sensor.set_option(rs.option.exposure, 32)  # Fast exposure (1-20ms range)
+        sensor.set_option(rs.option.gain, 64)  # Compensate for low exposure
         
         # Extract and save camera intrinsics
         self.intr = cfg.get_stream(rs.stream.color).as_video_stream_profile().get_intrinsics()
@@ -148,7 +149,7 @@ def start_capture_loop(stop_event, clock, out_dir, show_frame, save_frame, width
     writer = AsyncImageWriter(out_dir=camera.out_dir) if save_frame else None
     idx = 0
     clock0 = clock.value
-    print("Starting capture loop...")
+    print("Starting capture loop... (press Ctrl + C to stop)")
     while not stop_event.is_set():
 
         try:
@@ -271,20 +272,26 @@ if __name__ == "__main__":
             while True:
                 clock.value = time.time() - t0
                 time.sleep(0.001)  # 1ms sleep for ~1kHz clock update
+
+                if clock.value > 60:
+                    print(f"stopping - maximum time reached: {clock.value}")
+                    break
         except KeyboardInterrupt:
             print("\nShutting down...")
 
-    src_dir = os.path.join(os.getcwd(), "out", args.out_dir)
-    dest_dir = os.path.join(
-        r"Z:\Forschung\Robotik\2022_2026_DFG_Kooperative_Manipulation\05_Ergebnisse\01_Messungen\avp",
-        args.out_dir, "images"
-    )
-    print(f"copying the generated images to {dest_dir} ... This can take a while ...")
-    os.makedirs(dest_dir, exist_ok=True)
-    for f in os.scandir(dest_dir):
-        if f.is_file():
+    if args.save_frame:
+        src_dir = os.path.join(os.getcwd(), "out", args.out_dir)
+        dest_dir = os.path.join(
+            args.out_dir, "images"
+        )
+        print(f"copying the generated images to {dest_dir} ... This can take a while ...")
+        os.makedirs(dest_dir, exist_ok=True)
+        existing = [f for f in os.scandir(dest_dir) if f.is_file()]
+        for f in tqdm(existing, desc="Clearing", unit="file"):
             os.unlink(f.path)
-    for f in os.scandir(src_dir):
-        if f.is_file():
+
+        print("copying ...")
+        files = [f for f in os.scandir(src_dir) if f.is_file()]
+        for f in tqdm(files, desc="Copying", unit="file"):
             shutil.copy(f.path, dest_dir)
-    print(f"Moved images from {src_dir} to {dest_dir}")
+        print(f"Moved images from {src_dir} to {dest_dir}")
